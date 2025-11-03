@@ -51,6 +51,7 @@ module cmac_subsystem #(
   output         m_axis_cmac_rx_tlast,
   output         m_axis_cmac_rx_tuser_err,
 
+`ifdef __synthesis__
   input    [3:0] gt_rxp,
   input    [3:0] gt_rxn,
   output   [3:0] gt_txp,
@@ -59,6 +60,22 @@ module cmac_subsystem #(
   input          gt_refclk_n,
 
   output         cmac_clk,
+`else
+  output         m_axis_cmac_tx_sim_tvalid,
+  output [511:0] m_axis_cmac_tx_sim_tdata,
+  output  [63:0] m_axis_cmac_tx_sim_tkeep,
+  output         m_axis_cmac_tx_sim_tlast,
+  output         m_axis_cmac_tx_sim_tuser_err,
+  input          m_axis_cmac_tx_sim_tready,
+
+  input          s_axis_cmac_rx_sim_tvalid,
+  input  [511:0] s_axis_cmac_rx_sim_tdata,
+  input   [63:0] s_axis_cmac_rx_sim_tkeep,
+  input          s_axis_cmac_rx_sim_tlast,
+  input          s_axis_cmac_rx_sim_tuser_err,
+
+  output reg     cmac_clk,
+`endif
 
   input          mod_rstn,
   output         mod_rst_done,
@@ -115,6 +132,7 @@ module cmac_subsystem #(
   wire         axis_cmac_rx_tlast;
   wire         axis_cmac_rx_tuser_err;
 
+  // Reset is clocked by the 125MHz AXI-Lite clock
   generic_reset #(
     .NUM_INPUT_CLK  (2),
     .RESET_DURATION (100)
@@ -181,6 +199,7 @@ module cmac_subsystem #(
     .aresetn             (axil_aresetn)
   );
 
+  // [TODO] replace this with an actual register access block
   axi_lite_slave #(
     .REG_ADDR_W (12),
     .REG_PREFIX (16'hC028 + (CMAC_ID << 8)) // for "CMAC0/1 QSFP28"
@@ -260,6 +279,7 @@ module cmac_subsystem #(
     .aresetn       (cmac_rstn)
   );
 
+`ifdef __synthesis__
   cmac_subsystem_cmac_wrapper #(
     .CMAC_ID (CMAC_ID)
   ) cmac_wrapper_inst (
@@ -305,5 +325,64 @@ module cmac_subsystem #(
 
     .axil_aclk           (axil_aclk)
   );
+`else // !`ifdef __synthesis__
+  generate begin: cmac_sim
+    if (CMAC_ID == 0) begin
+      initial begin
+        cmac_clk = 1'b1;
+        forever #1552ps cmac_clk = ~cmac_clk;
+      end
+    end
+    else begin
+      initial begin
+        // Assume a random phase shift with CMAC-0 clock 
+        cmac_clk = 1'b0;
+        #(1ps * ($urandom % 3103));
+        cmac_clk = 1'b1;
+        forever #1552ps cmac_clk = ~cmac_clk;
+      end
+    end
+
+    // CMAC registers do not exist in simulation
+    axi_lite_slave #(
+      .REG_ADDR_W (13),
+      .REG_PREFIX (16'hC000 + (CMAC_ID << 8)) // C000 -> CMAC0, C100 -> CMAC1
+    ) cmac_reg_inst (
+      .s_axil_awvalid (axil_cmac_awvalid),
+      .s_axil_awaddr  (axil_cmac_awaddr),
+      .s_axil_awready (axil_cmac_awready),
+      .s_axil_wvalid  (axil_cmac_wvalid),
+      .s_axil_wdata   (axil_cmac_wdata),
+      .s_axil_wready  (axil_cmac_wready),
+      .s_axil_bvalid  (axil_cmac_bvalid),
+      .s_axil_bresp   (axil_cmac_bresp),
+      .s_axil_bready  (axil_cmac_bready),
+      .s_axil_arvalid (axil_cmac_arvalid),
+      .s_axil_araddr  (axil_cmac_araddr),
+      .s_axil_arready (axil_cmac_arready),
+      .s_axil_rvalid  (axil_cmac_rvalid),
+      .s_axil_rdata   (axil_cmac_rdata),
+      .s_axil_rresp   (axil_cmac_rresp),
+      .s_axil_rready  (axil_cmac_rready),
+
+      .aclk           (axil_aclk),
+      .aresetn        (axil_aresetn)
+    );
+  end: cmac_sim
+  endgenerate
+
+  assign m_axis_cmac_tx_sim_tvalid    = axis_cmac_tx_tvalid;
+  assign m_axis_cmac_tx_sim_tdata     = axis_cmac_tx_tdata;
+  assign m_axis_cmac_tx_sim_tkeep     = axis_cmac_tx_tkeep;
+  assign m_axis_cmac_tx_sim_tlast     = axis_cmac_tx_tlast;
+  assign m_axis_cmac_tx_sim_tuser_err = axis_cmac_tx_tuser_err;
+  assign axis_cmac_tx_tready          = m_axis_cmac_tx_sim_tready;
+
+  assign axis_cmac_rx_tvalid          = s_axis_cmac_rx_sim_tvalid;
+  assign axis_cmac_rx_tdata           = s_axis_cmac_rx_sim_tdata;
+  assign axis_cmac_rx_tkeep           = s_axis_cmac_rx_sim_tkeep;
+  assign axis_cmac_rx_tlast           = s_axis_cmac_rx_sim_tlast;
+  assign axis_cmac_rx_tuser_err       = s_axis_cmac_rx_sim_tuser_err;
+`endif
 
 endmodule: cmac_subsystem

@@ -22,11 +22,21 @@ module open_nic_shell #(
   parameter int    MIN_PKT_LEN     = 64,
   parameter int    MAX_PKT_LEN     = 1518,
   parameter int    USE_PHYS_FUNC   = 1,
-  parameter int    NUM_PHYS_FUNC   = 2,
+  parameter int    NUM_PHYS_FUNC   = 1,
   parameter int    NUM_QUEUE       = 512,
-  parameter int    NUM_CMAC_PORT   = 2
-) 
-(
+  parameter int    NUM_CMAC_PORT   = 1
+) (
+
+`ifdef __synthesis__
+`ifdef __au280__  
+  output                                QSFP1_RESETL,
+output                                QSFP2_RESETL,
+output                                QSFP1_LPMODE,
+output                                QSFP2_LPMODE,
+
+  output                         hbm_cattrip, // Fix the CATTRIP issue for AU280 custom flow
+`endif
+
   input                   [15:0] pcie_rxp,
   input                   [15:0] pcie_rxn,
   output                  [15:0] pcie_txp,
@@ -34,128 +44,171 @@ module open_nic_shell #(
   input                          pcie_refclk_p,
   input                          pcie_refclk_n,
   input                          pcie_rstn,
+  
+    output                                QSFP1_RESETL,
+  output                                QSFP2_RESETL,
+  output                                QSFP1_LPMODE,
+  output                                QSFP2_LPMODE,
 
   input    [4*NUM_CMAC_PORT-1:0] qsfp_rxp,
   input    [4*NUM_CMAC_PORT-1:0] qsfp_rxn,
   output   [4*NUM_CMAC_PORT-1:0] qsfp_txp,
   output   [4*NUM_CMAC_PORT-1:0] qsfp_txn,
   input      [NUM_CMAC_PORT-1:0] qsfp_refclk_p,
-  input      [NUM_CMAC_PORT-1:0] qsfp_refclk_n,
-  
-  output                         QSFP1_RESETL,
-  output                         QSFP2_RESETL,
-  output                         QSFP1_LPMODE,
-  output                         QSFP2_LPMODE,
+  input      [NUM_CMAC_PORT-1:0] qsfp_refclk_n
+`else // !`ifdef __synthesis__
+  input                          s_axil_sim_awvalid,
+  input                   [31:0] s_axil_sim_awaddr,
+  output                         s_axil_sim_awready,
+  input                          s_axil_sim_wvalid,
+  input                   [31:0] s_axil_sim_wdata,
+  output                         s_axil_sim_wready,
+  output                         s_axil_sim_bvalid,
+  output                   [1:0] s_axil_sim_bresp,
+  input                          s_axil_sim_bready,
+  input                          s_axil_sim_arvalid,
+  input                   [31:0] s_axil_sim_araddr,
+  output                         s_axil_sim_arready,
+  output                         s_axil_sim_rvalid,
+  output                  [31:0] s_axil_sim_rdata,
+  output                   [1:0] s_axil_sim_rresp,
+  input                          s_axil_sim_rready,
 
-  input                          c0_sys_clk_p,
-  input                          c0_sys_clk_n,
-  output                         c0_ddr4_act_n,
-  output [16:0]                  c0_ddr4_adr,
-  output [1:0]                   c0_ddr4_ba,
-  output [1:0]                   c0_ddr4_bg,
-  output [0:0]                   c0_ddr4_cke,
-  output [0:0]                   c0_ddr4_odt,
-  output [0:0]                   c0_ddr4_cs_n,
-  output [0:0]                   c0_ddr4_ck_t,
-  output [0:0]                   c0_ddr4_ck_c,
-  output                         c0_ddr4_reset_n,
-  inout  [8:0]                   c0_ddr4_dm_dbi_n,
-  inout  [71:0]                  c0_ddr4_dq,
-  inout  [8:0]                   c0_ddr4_dqs_c,
-  inout  [8:0]                   c0_ddr4_dqs_t,
+  input                          s_axis_qdma_h2c_sim_tvalid,
+  input                  [511:0] s_axis_qdma_h2c_sim_tdata,
+  input                   [31:0] s_axis_qdma_h2c_sim_tcrc,
+  input                          s_axis_qdma_h2c_sim_tlast,
+  input                   [10:0] s_axis_qdma_h2c_sim_tuser_qid,
+  input                    [2:0] s_axis_qdma_h2c_sim_tuser_port_id,
+  input                          s_axis_qdma_h2c_sim_tuser_err,
+  input                   [31:0] s_axis_qdma_h2c_sim_tuser_mdata,
+  input                    [5:0] s_axis_qdma_h2c_sim_tuser_mty,
+  input                          s_axis_qdma_h2c_sim_tuser_zero_byte,
+  output                         s_axis_qdma_h2c_sim_tready,
 
-  input                          c1_sys_clk_p,
-  input                          c1_sys_clk_n,
-  output                         c1_ddr4_act_n,
-  output [16:0]                  c1_ddr4_adr,
-  output [1:0]                   c1_ddr4_ba,
-  output [1:0]                   c1_ddr4_bg,
-  output [0:0]                   c1_ddr4_cke,
-  output [0:0]                   c1_ddr4_odt,
-  output [0:0]                   c1_ddr4_cs_n,
-  output [0:0]                   c1_ddr4_ck_t,
-  output [0:0]                   c1_ddr4_ck_c,
-  output                         c1_ddr4_reset_n,
-  inout  [8:0]                   c1_ddr4_dm_dbi_n,
-  inout  [71:0]                  c1_ddr4_dq,
-  inout  [8:0]                   c1_ddr4_dqs_c,
-  inout  [8:0]                   c1_ddr4_dqs_t,
+  output                         m_axis_qdma_c2h_sim_tvalid,
+  output                 [511:0] m_axis_qdma_c2h_sim_tdata,
+  output                  [31:0] m_axis_qdma_c2h_sim_tcrc,
+  output                         m_axis_qdma_c2h_sim_tlast,
+  output                         m_axis_qdma_c2h_sim_ctrl_marker,
+  output                   [2:0] m_axis_qdma_c2h_sim_ctrl_port_id,
+  output                   [6:0] m_axis_qdma_c2h_sim_ctrl_ecc,
+  output                  [15:0] m_axis_qdma_c2h_sim_ctrl_len,
+  output                  [10:0] m_axis_qdma_c2h_sim_ctrl_qid,
+  output                         m_axis_qdma_c2h_sim_ctrl_has_cmpt,
+  output                   [5:0] m_axis_qdma_c2h_sim_mty,
+  input                          m_axis_qdma_c2h_sim_tready,
 
-  input                          c2_sys_clk_p,
-  input                          c2_sys_clk_n,
-  output                         c2_ddr4_act_n,
-  output [16:0]                  c2_ddr4_adr,
-  output [1:0]                   c2_ddr4_ba,
-  output [1:0]                   c2_ddr4_bg,
-  output [0:0]                   c2_ddr4_cke,
-  output [0:0]                   c2_ddr4_odt,
-  output [0:0]                   c2_ddr4_cs_n,
-  output [0:0]                   c2_ddr4_ck_t,
-  output [0:0]                   c2_ddr4_ck_c,
-  output                         c2_ddr4_reset_n,
-  inout  [8:0]                   c2_ddr4_dm_dbi_n,
-  inout  [71:0]                  c2_ddr4_dq,
-  inout  [8:0]                   c2_ddr4_dqs_c,
-  inout  [8:0]                   c2_ddr4_dqs_t,
+  output                         m_axis_qdma_cpl_sim_tvalid,
+  output                 [511:0] m_axis_qdma_cpl_sim_tdata,
+  output                   [1:0] m_axis_qdma_cpl_sim_size,
+  output                  [15:0] m_axis_qdma_cpl_sim_dpar,
+  output                  [10:0] m_axis_qdma_cpl_sim_ctrl_qid,
+  output                   [1:0] m_axis_qdma_cpl_sim_ctrl_cmpt_type,
+  output                  [15:0] m_axis_qdma_cpl_sim_ctrl_wait_pld_pkt_id,
+  output                   [2:0] m_axis_qdma_cpl_sim_ctrl_port_id,
+  output                         m_axis_qdma_cpl_sim_ctrl_marker,
+  output                         m_axis_qdma_cpl_sim_ctrl_user_trig,
+  output                   [2:0] m_axis_qdma_cpl_sim_ctrl_col_idx,
+  output                   [2:0] m_axis_qdma_cpl_sim_ctrl_err_idx,
+  output                         m_axis_qdma_cpl_sim_ctrl_no_wrb_marker,
+  input                          m_axis_qdma_cpl_sim_tready,
 
-  input                          c3_sys_clk_p,
-  input                          c3_sys_clk_n,
-  output                         c3_ddr4_act_n,
-  output [16:0]                  c3_ddr4_adr,
-  output [1:0]                   c3_ddr4_ba,
-  output [1:0]                   c3_ddr4_bg,
-  output [0:0]                   c3_ddr4_cke,
-  output [0:0]                   c3_ddr4_odt,
-  output [0:0]                   c3_ddr4_cs_n,
-  output [0:0]                   c3_ddr4_ck_t,
-  output [0:0]                   c3_ddr4_ck_c,
-  output                         c3_ddr4_reset_n,
-  inout  [8:0]                   c3_ddr4_dm_dbi_n,
-  inout  [71:0]                  c3_ddr4_dq,
-  inout  [8:0]                   c3_ddr4_dqs_c,
-  inout  [8:0]                   c3_ddr4_dqs_t
+  output     [NUM_CMAC_PORT-1:0] m_axis_cmac_tx_sim_tvalid,
+  output [512*NUM_CMAC_PORT-1:0] m_axis_cmac_tx_sim_tdata,
+  output  [64*NUM_CMAC_PORT-1:0] m_axis_cmac_tx_sim_tkeep,
+  output     [NUM_CMAC_PORT-1:0] m_axis_cmac_tx_sim_tlast,
+  output     [NUM_CMAC_PORT-1:0] m_axis_cmac_tx_sim_tuser_err,
+  input      [NUM_CMAC_PORT-1:0] m_axis_cmac_tx_sim_tready,
+
+  input      [NUM_CMAC_PORT-1:0] s_axis_cmac_rx_sim_tvalid,
+  input  [512*NUM_CMAC_PORT-1:0] s_axis_cmac_rx_sim_tdata,
+  input   [64*NUM_CMAC_PORT-1:0] s_axis_cmac_rx_sim_tkeep,
+  input      [NUM_CMAC_PORT-1:0] s_axis_cmac_rx_sim_tlast,
+  input      [NUM_CMAC_PORT-1:0] s_axis_cmac_rx_sim_tuser_err,
+
+  input                          powerup_rstn
+`endif
 );
 
+  // Parameter DRC
+  initial begin
+    if (MIN_PKT_LEN > 256 || MIN_PKT_LEN < 64) begin
+      $fatal("[%m] Minimum packet length should be within the range [64, 256]");
+    end
+    if (MAX_PKT_LEN > 9600 || MAX_PKT_LEN < 256) begin
+      $fatal("[%m] Maximum packet length should be within the range [256, 9600]");
+    end
+    if (USE_PHYS_FUNC) begin
+      if (NUM_QUEUE > 2048 || NUM_QUEUE < 1) begin
+        $fatal("[%m] Number of queues should be within the range [1, 2048]");
+      end
+      if ((NUM_QUEUE & (NUM_QUEUE - 1)) != 0) begin
+        $fatal("[%m] Number of queues should be 2^n");
+      end
+      if (NUM_PHYS_FUNC > 4 || NUM_PHYS_FUNC < 1) begin
+        $fatal("[%m] Number of physical functions should be within the range [1, 4]");
+      end
+    end
+    if (NUM_CMAC_PORT > 2 || NUM_CMAC_PORT < 1) begin
+      $fatal("[%m] Number of CMACs should be within the range [1, 2]");
+    end
+  end
+
+`ifdef __synthesis__
   wire         powerup_rstn;
   wire         pcie_user_lnk_up;
   wire         pcie_phy_ready;
 
   // BAR2-mapped master AXI-Lite feeding into system configuration block
-  wire         axil_pcie_awvalid;
-  wire  [31:0] axil_pcie_awaddr;
-  wire         axil_pcie_awready;
-  wire         axil_pcie_wvalid;
-  wire  [31:0] axil_pcie_wdata;
-  wire         axil_pcie_wready;
-  wire         axil_pcie_bvalid;
-  wire   [1:0] axil_pcie_bresp;
-  wire         axil_pcie_bready;
-  wire         axil_pcie_arvalid;
-  wire  [31:0] axil_pcie_araddr;
-  wire         axil_pcie_arready;
-  wire         axil_pcie_rvalid;
-  wire  [31:0] axil_pcie_rdata;
-  wire   [1:0] axil_pcie_rresp;
-  wire         axil_pcie_rready;
+(* MARK_DEBUG="true" *)  wire         axil_pcie_awvalid;
+(* MARK_DEBUG="true" *)  wire  [31:0] axil_pcie_awaddr;
+(* MARK_DEBUG="true" *)  wire         axil_pcie_awready;
+(* MARK_DEBUG="true" *)  wire         axil_pcie_wvalid;
+(* MARK_DEBUG="true" *)  wire  [31:0] axil_pcie_wdata;
+(* MARK_DEBUG="true" *) wire         axil_pcie_wready;
+(* MARK_DEBUG="true" *)  wire         axil_pcie_bvalid;
+(* MARK_DEBUG="true" *)  wire   [1:0] axil_pcie_bresp;
+(* MARK_DEBUG="true" *)  wire         axil_pcie_bready;
+(* MARK_DEBUG="true" *)  wire         axil_pcie_arvalid;
+(* MARK_DEBUG="true" *)  wire  [31:0] axil_pcie_araddr;
+(* MARK_DEBUG="true" *)  wire         axil_pcie_arready;
+(* MARK_DEBUG="true" *)  wire         axil_pcie_rvalid;
+(* MARK_DEBUG="true" *)  wire  [31:0] axil_pcie_rdata;
+(* MARK_DEBUG="true" *)  wire   [1:0] axil_pcie_rresp;
+(* MARK_DEBUG="true" *)  wire         axil_pcie_rready;
 
   IBUF pcie_rstn_ibuf_inst (.I(pcie_rstn), .O(pcie_rstn_int));
 
-  wire                         axil_qdma_awvalid;
-  wire                  [31:0] axil_qdma_awaddr;
-  wire                         axil_qdma_awready;
-  wire                         axil_qdma_wvalid;
-  wire                  [31:0] axil_qdma_wdata;
-  wire                         axil_qdma_wready;
-  wire                         axil_qdma_bvalid;
-  wire                   [1:0] axil_qdma_bresp;
-  wire                         axil_qdma_bready;
-  wire                         axil_qdma_arvalid;
-  wire                  [31:0] axil_qdma_araddr;
-  wire                         axil_qdma_arready;
-  wire                         axil_qdma_rvalid;
-  wire                  [31:0] axil_qdma_rdata;
-  wire                   [1:0] axil_qdma_rresp;
-  wire                         axil_qdma_rready;
+`ifdef __au280__
+  // Fix the CATTRIP issue for AU280 custom flow
+  //
+  // This pin must be tied to 0; otherwise the board might be unrecoverable
+  // after programming
+  OBUF hbm_cattrip_obuf_inst (.I(1'b0), .O(hbm_cattrip));
+`endif
+
+`ifdef __zynq_family__
+  zynq_usplus_ps zynq_usplus_ps_inst ();
+`endif
+`endif
+
+(* MARK_DEBUG="true" *)  wire                         axil_qdma_awvalid;
+(* MARK_DEBUG="true" *)  wire                  [31:0] axil_qdma_awaddr;
+(* MARK_DEBUG="true" *)  wire                         axil_qdma_awready;
+ (* MARK_DEBUG="true" *) wire                         axil_qdma_wvalid;
+(* MARK_DEBUG="true" *)  wire                  [31:0] axil_qdma_wdata;
+(* MARK_DEBUG="true" *)  wire                         axil_qdma_wready;
+(* MARK_DEBUG="true" *)  wire                         axil_qdma_bvalid;
+(* MARK_DEBUG="true" *)  wire                   [1:0] axil_qdma_bresp;
+(* MARK_DEBUG="true" *)  wire                         axil_qdma_bready;
+(* MARK_DEBUG="true" *)  wire                         axil_qdma_arvalid;
+ (* MARK_DEBUG="true" *) wire                  [31:0] axil_qdma_araddr;
+(* MARK_DEBUG="true" *)  wire                         axil_qdma_arready;
+ (* MARK_DEBUG="true" *) wire                         axil_qdma_rvalid;
+  (* MARK_DEBUG="true" *)wire                  [31:0] axil_qdma_rdata;
+ (* MARK_DEBUG="true" *) wire                   [1:0] axil_qdma_rresp;
+ (* MARK_DEBUG="true" *) wire                         axil_qdma_rready;
 
   wire     [NUM_CMAC_PORT-1:0] axil_adap_awvalid;
   wire  [32*NUM_CMAC_PORT-1:0] axil_adap_awaddr;
@@ -225,25 +278,26 @@ module open_nic_shell #(
   wire                   [1:0] axil_box1_rresp;
   wire                         axil_box1_rready;
 
-  wire     [NUM_PHYS_FUNC-1:0] axis_qdma_h2c_tvalid;
-  wire [512*NUM_PHYS_FUNC-1:0] axis_qdma_h2c_tdata;
-  wire  [64*NUM_PHYS_FUNC-1:0] axis_qdma_h2c_tkeep;
-  wire     [NUM_PHYS_FUNC-1:0] axis_qdma_h2c_tlast;
-  wire  [16*NUM_PHYS_FUNC-1:0] axis_qdma_h2c_tuser_size;
-  wire  [16*NUM_PHYS_FUNC-1:0] axis_qdma_h2c_tuser_src;
-  wire  [16*NUM_PHYS_FUNC-1:0] axis_qdma_h2c_tuser_dst;
-  wire     [NUM_PHYS_FUNC-1:0] axis_qdma_h2c_tready;
+  // QDMA subsystem interfaces to the box running at 250MHz
+(* MARK_DEBUG="true" *)  wire     [NUM_PHYS_FUNC-1:0] axis_qdma_h2c_tvalid;
+(* MARK_DEBUG="true" *)  wire [512*NUM_PHYS_FUNC-1:0] axis_qdma_h2c_tdata;
+(* MARK_DEBUG="true" *)  wire  [64*NUM_PHYS_FUNC-1:0] axis_qdma_h2c_tkeep;
+(* MARK_DEBUG="true" *)  wire     [NUM_PHYS_FUNC-1:0] axis_qdma_h2c_tlast;
+(* MARK_DEBUG="true" *)  wire  [16*NUM_PHYS_FUNC-1:0] axis_qdma_h2c_tuser_size;
+(* MARK_DEBUG="true" *)  wire  [16*NUM_PHYS_FUNC-1:0] axis_qdma_h2c_tuser_src;
+(* MARK_DEBUG="true" *)  wire  [16*NUM_PHYS_FUNC-1:0] axis_qdma_h2c_tuser_dst;
+(* MARK_DEBUG="true" *)  wire     [NUM_PHYS_FUNC-1:0] axis_qdma_h2c_tready;
 
-  wire     [NUM_PHYS_FUNC-1:0] axis_qdma_c2h_tvalid;
-  wire [512*NUM_PHYS_FUNC-1:0] axis_qdma_c2h_tdata;
-  wire  [64*NUM_PHYS_FUNC-1:0] axis_qdma_c2h_tkeep;
-  wire     [NUM_PHYS_FUNC-1:0] axis_qdma_c2h_tlast;
-  wire  [16*NUM_PHYS_FUNC-1:0] axis_qdma_c2h_tuser_size;
-  wire  [16*NUM_PHYS_FUNC-1:0] axis_qdma_c2h_tuser_src;
-  wire  [16*NUM_PHYS_FUNC-1:0] axis_qdma_c2h_tuser_dst;
-  wire     [NUM_PHYS_FUNC-1:0] axis_qdma_c2h_tready;
+(* MARK_DEBUG="true" *)  wire     [NUM_PHYS_FUNC-1:0] axis_qdma_c2h_tvalid;
+(* MARK_DEBUG="true" *)  wire [512*NUM_PHYS_FUNC-1:0] axis_qdma_c2h_tdata;
+(* MARK_DEBUG="true" *)  wire  [64*NUM_PHYS_FUNC-1:0] axis_qdma_c2h_tkeep;
+(* MARK_DEBUG="true" *)  wire     [NUM_PHYS_FUNC-1:0] axis_qdma_c2h_tlast;
+(* MARK_DEBUG="true" *)  wire  [16*NUM_PHYS_FUNC-1:0] axis_qdma_c2h_tuser_size;
+(* MARK_DEBUG="true" *)  wire  [16*NUM_PHYS_FUNC-1:0] axis_qdma_c2h_tuser_src;
+(* MARK_DEBUG="true" *)  wire  [16*NUM_PHYS_FUNC-1:0] axis_qdma_c2h_tuser_dst;
+(* MARK_DEBUG="true" *)  wire     [NUM_PHYS_FUNC-1:0] axis_qdma_c2h_tready;
 
-
+  // Packet adapter interfaces to the box running at 250MHz
   wire     [NUM_CMAC_PORT-1:0] axis_adap_tx_250mhz_tvalid;
   wire [512*NUM_CMAC_PORT-1:0] axis_adap_tx_250mhz_tdata;
   wire  [64*NUM_CMAC_PORT-1:0] axis_adap_tx_250mhz_tkeep;
@@ -262,7 +316,7 @@ module open_nic_shell #(
   wire  [16*NUM_CMAC_PORT-1:0] axis_adap_rx_250mhz_tuser_dst;
   wire     [NUM_CMAC_PORT-1:0] axis_adap_rx_250mhz_tready;
 
-
+  // Packet adapter interfaces to the box running at 322MHz
   wire     [NUM_CMAC_PORT-1:0] axis_adap_tx_322mhz_tvalid;
   wire [512*NUM_CMAC_PORT-1:0] axis_adap_tx_322mhz_tdata;
   wire  [64*NUM_CMAC_PORT-1:0] axis_adap_tx_322mhz_tkeep;
@@ -276,38 +330,39 @@ module open_nic_shell #(
   wire     [NUM_CMAC_PORT-1:0] axis_adap_rx_322mhz_tlast;
   wire     [NUM_CMAC_PORT-1:0] axis_adap_rx_322mhz_tuser_err;
 
-  wire     [NUM_CMAC_PORT-1:0] axis_cmac_tx_tvalid;
-  wire [512*NUM_CMAC_PORT-1:0] axis_cmac_tx_tdata;
-  wire  [64*NUM_CMAC_PORT-1:0] axis_cmac_tx_tkeep;
-  wire     [NUM_CMAC_PORT-1:0] axis_cmac_tx_tlast;
-  wire     [NUM_CMAC_PORT-1:0] axis_cmac_tx_tuser_err;
-  wire     [NUM_CMAC_PORT-1:0] axis_cmac_tx_tready;
+  // CMAC subsystem interfaces to the box running at 322MHz
+(* MARK_DEBUG="true" *)  wire     [NUM_CMAC_PORT-1:0] axis_cmac_tx_tvalid;
+(* MARK_DEBUG="true" *)  wire [512*NUM_CMAC_PORT-1:0] axis_cmac_tx_tdata;
+(* MARK_DEBUG="true" *)  wire  [64*NUM_CMAC_PORT-1:0] axis_cmac_tx_tkeep;
+(* MARK_DEBUG="true" *)  wire     [NUM_CMAC_PORT-1:0] axis_cmac_tx_tlast;
+(* MARK_DEBUG="true" *)  wire     [NUM_CMAC_PORT-1:0] axis_cmac_tx_tuser_err;
+(* MARK_DEBUG="true" *)  wire     [NUM_CMAC_PORT-1:0] axis_cmac_tx_tready;
 
-  wire     [NUM_CMAC_PORT-1:0] axis_cmac_rx_tvalid;
-  wire [512*NUM_CMAC_PORT-1:0] axis_cmac_rx_tdata;
-  wire  [64*NUM_CMAC_PORT-1:0] axis_cmac_rx_tkeep;
-  wire     [NUM_CMAC_PORT-1:0] axis_cmac_rx_tlast;
-  wire     [NUM_CMAC_PORT-1:0] axis_cmac_rx_tuser_err;
+(* MARK_DEBUG="true" *)  wire     [NUM_CMAC_PORT-1:0] axis_cmac_rx_tvalid;
+(* MARK_DEBUG="true" *)  wire [512*NUM_CMAC_PORT-1:0] axis_cmac_rx_tdata;
+(* MARK_DEBUG="true" *)  wire  [64*NUM_CMAC_PORT-1:0] axis_cmac_rx_tkeep;
+(* MARK_DEBUG="true" *)  wire     [NUM_CMAC_PORT-1:0] axis_cmac_rx_tlast;
+(* MARK_DEBUG="true" *)  wire     [NUM_CMAC_PORT-1:0] axis_cmac_rx_tuser_err;
 
-  wire                  [31:0] shell_rstn;
-  wire                  [31:0] shell_rst_done;
-  wire                         qdma_rstn;
-  wire                         qdma_rst_done;
-  wire     [NUM_CMAC_PORT-1:0] adap_rstn;
-  wire     [NUM_CMAC_PORT-1:0] adap_rst_done;
-  wire     [NUM_CMAC_PORT-1:0] cmac_rstn;
-  wire     [NUM_CMAC_PORT-1:0] cmac_rst_done;
+(* MARK_DEBUG="true" *)  wire                  [31:0] shell_rstn;
+(* MARK_DEBUG="true" *)  wire                  [31:0] shell_rst_done;
+(* MARK_DEBUG="true" *)  wire                         qdma_rstn;
+(* MARK_DEBUG="true" *)  wire                         qdma_rst_done;
+(* MARK_DEBUG="true" *)  wire     [NUM_CMAC_PORT-1:0] adap_rstn;
+(* MARK_DEBUG="true" *)  wire     [NUM_CMAC_PORT-1:0] adap_rst_done;
+(* MARK_DEBUG="true" *)  wire     [NUM_CMAC_PORT-1:0] cmac_rstn;
+(* MARK_DEBUG="true" *)  wire     [NUM_CMAC_PORT-1:0] cmac_rst_done;
 
-  wire                  [31:0] user_rstn;
-  wire                  [31:0] user_rst_done;
-  wire                  [15:0] user_250mhz_rstn;
-  wire                  [15:0] user_250mhz_rst_done;
-  wire                   [7:0] user_322mhz_rstn;
-  wire                   [7:0] user_322mhz_rst_done;
-  wire                         box_250mhz_rstn;
-  wire                         box_250mhz_rst_done;
-  wire                         box_322mhz_rstn;
-  wire                         box_322mhz_rst_done;
+(* MARK_DEBUG="true" *)  wire                  [31:0] user_rstn;
+(* MARK_DEBUG="true" *)  wire                  [31:0] user_rst_done;
+(* MARK_DEBUG="true" *)  wire                  [15:0] user_250mhz_rstn;
+(* MARK_DEBUG="true" *)  wire                  [15:0] user_250mhz_rst_done;
+(* MARK_DEBUG="true" *)  wire                   [7:0] user_322mhz_rstn;
+(* MARK_DEBUG="true" *)  wire                   [7:0] user_322mhz_rst_done;
+(* MARK_DEBUG="true" *)  wire                         box_250mhz_rstn;
+ (* MARK_DEBUG="true" *) wire                         box_250mhz_rst_done;
+ (* MARK_DEBUG="true" *) wire                         box_322mhz_rstn;
+(* MARK_DEBUG="true" *)  wire                         box_322mhz_rst_done;
 
   wire                         axil_aclk;
   wire                         axis_aclk;
@@ -357,6 +412,7 @@ module open_nic_shell #(
     .BUILD_TIMESTAMP (BUILD_TIMESTAMP),
     .NUM_CMAC_PORT   (NUM_CMAC_PORT)
   ) system_config_inst (
+`ifdef __synthesis__
     .s_axil_awvalid      (axil_pcie_awvalid),
     .s_axil_awaddr       (axil_pcie_awaddr),
     .s_axil_awready      (axil_pcie_awready),
@@ -373,6 +429,24 @@ module open_nic_shell #(
     .s_axil_rdata        (axil_pcie_rdata),
     .s_axil_rresp        (axil_pcie_rresp),
     .s_axil_rready       (axil_pcie_rready),
+`else // !`ifdef __synthesis__
+    .s_axil_awvalid      (s_axil_sim_awvalid),
+    .s_axil_awaddr       (s_axil_sim_awaddr),
+    .s_axil_awready      (s_axil_sim_awready),
+    .s_axil_wvalid       (s_axil_sim_wvalid),
+    .s_axil_wdata        (s_axil_sim_wdata),
+    .s_axil_wready       (s_axil_sim_wready),
+    .s_axil_bvalid       (s_axil_sim_bvalid),
+    .s_axil_bresp        (s_axil_sim_bresp),
+    .s_axil_bready       (s_axil_sim_bready),
+    .s_axil_arvalid      (s_axil_sim_arvalid),
+    .s_axil_araddr       (s_axil_sim_araddr),
+    .s_axil_arready      (s_axil_sim_arready),
+    .s_axil_rvalid       (s_axil_sim_rvalid),
+    .s_axil_rdata        (s_axil_sim_rdata),
+    .s_axil_rresp        (s_axil_sim_rresp),
+    .s_axil_rready       (s_axil_sim_rready),
+`endif
 
     .m_axil_qdma_awvalid (axil_qdma_awvalid),
     .m_axil_qdma_awaddr  (axil_qdma_awaddr),
@@ -468,51 +542,6 @@ module open_nic_shell #(
     .aresetn             (powerup_rstn)
   );
 
-wire          m_axi_awready;
-wire  [3 : 0] m_axi_awid;
-wire  [63 : 0]m_axi_awaddr;
-wire  [31 : 0]m_axi_awuser;
-wire  [7 : 0] m_axi_awlen;
-wire  [2 : 0] m_axi_awsize;
-wire  [1 : 0] m_axi_awburst;
-wire  [2 : 0] m_axi_awprot;
-wire          m_axi_awvalid;
-wire          m_axi_awlock;
-wire  [3 : 0] m_axi_awcache;
-
-wire          m_axi_wready;
-wire  [511:0] m_axi_wdata;
-wire  [63 :0] m_axi_wuser;
-wire  [63 :0] m_axi_wstrb;
-wire          m_axi_wlast;
-wire          m_axi_wvalid;
-
-wire [3 : 0]  m_axi_bid;
-wire [1 : 0]  m_axi_bresp;
-wire          m_axi_bvalid;
-wire          m_axi_bready;
-
-wire          m_axi_arready;
-wire  [3 : 0] m_axi_arid;
-wire  [63 : 0]m_axi_araddr;
-wire  [31 : 0]m_axi_aruser;
-wire  [7 : 0] m_axi_arlen;
-wire  [2 : 0] m_axi_arsize;
-wire  [1 : 0] m_axi_arburst;
-wire  [2 : 0] m_axi_arprot;
-wire          m_axi_arvalid;
-wire          m_axi_arlock;
-wire  [3 : 0] m_axi_arcache; 
-
-wire [3 : 0]  m_axi_rid;
-wire [511:0]  m_axi_rdata;
-wire [1 : 0]  m_axi_rresp;
-wire          m_axi_rlast;
-wire          m_axi_rvalid;
-wire          m_axi_rready;
-
-
-
   qdma_subsystem #(
     .MIN_PKT_LEN   (MIN_PKT_LEN),
     .MAX_PKT_LEN   (MAX_PKT_LEN),
@@ -555,6 +584,7 @@ wire          m_axi_rready;
     .s_axis_c2h_tuser_dst                 (axis_qdma_c2h_tuser_dst),
     .s_axis_c2h_tready                    (axis_qdma_c2h_tready),
 
+`ifdef __synthesis__
     .pcie_rxp                             (pcie_rxp),
     .pcie_rxn                             (pcie_rxn),
     .pcie_txp                             (pcie_txp),
@@ -577,55 +607,53 @@ wire          m_axi_rready;
     .m_axil_pcie_rresp                    (axil_pcie_rresp),
     .m_axil_pcie_rready                   (axil_pcie_rready),
 
-    .m_axi_awready                        (m_axi_awready  ),
-    .m_axi_awid                           (m_axi_awid     ),
-    .m_axi_awaddr                         (m_axi_awaddr   ),
-    .m_axi_awuser                         (m_axi_awuser   ),
-    .m_axi_awlen                          (m_axi_awlen    ),
-    .m_axi_awsize                         (m_axi_awsize   ),
-    .m_axi_awburst                        (m_axi_awburst  ),  
-    .m_axi_awprot                         (m_axi_awprot   ),
-    .m_axi_awvalid                        (m_axi_awvalid  ),  
-    .m_axi_awlock                         (m_axi_awlock   ),
-    .m_axi_awcache                        (m_axi_awcache  ),
-
-    .m_axi_wready                         (m_axi_wready   ),
-    .m_axi_wdata                          (m_axi_wdata    ),
-    .m_axi_wuser                          (m_axi_wuser    ),
-    .m_axi_wstrb                          (m_axi_wstrb    ),
-    .m_axi_wlast                          (m_axi_wlast    ),
-    .m_axi_wvalid                         (m_axi_wvalid   ),
-
-    .m_axi_bid                            (m_axi_bid      ), 
-    .m_axi_bresp                          (m_axi_bresp    ), 
-    .m_axi_bvalid                         (m_axi_bvalid   ), 
-    .m_axi_bready                         (m_axi_bready   ), 
-
-    .m_axi_arready                        (m_axi_arready  ),
-    .m_axi_arid                           (m_axi_arid     ),
-    .m_axi_araddr                         (m_axi_araddr   ),
-    .m_axi_aruser                         (m_axi_aruser   ),
-    .m_axi_arlen                          (m_axi_arlen    ),
-    .m_axi_arsize                         (m_axi_arsize   ),
-    .m_axi_arburst                        (m_axi_arburst  ),
-    .m_axi_arprot                         (m_axi_arprot   ),
-    .m_axi_arvalid                        (m_axi_arvalid  ),
-    .m_axi_arlock                         (m_axi_arlock   ),
-    .m_axi_arcache                        (m_axi_arcache  ),
-
-    .m_axi_rid                            (m_axi_rid      ),
-    .m_axi_rdata                          (m_axi_rdata    ),
-    .m_axi_rresp                          (m_axi_rresp    ),
-    .m_axi_rlast                          (m_axi_rlast    ),
-    .m_axi_rvalid                         (m_axi_rvalid   ),
-    .m_axi_rready                         (m_axi_rready   ),
-    
     .pcie_refclk_p                        (pcie_refclk_p),
     .pcie_refclk_n                        (pcie_refclk_n),
     .pcie_rstn                            (pcie_rstn_int),
     .user_lnk_up                          (pcie_user_lnk_up),
     .phy_ready                            (pcie_phy_ready),
     .powerup_rstn                         (powerup_rstn),
+`else // !`ifdef __synthesis__
+    .s_axis_qdma_h2c_tvalid               (s_axis_qdma_h2c_sim_tvalid),
+    .s_axis_qdma_h2c_tdata                (s_axis_qdma_h2c_sim_tdata),
+    .s_axis_qdma_h2c_tcrc                 (s_axis_qdma_h2c_sim_tcrc),
+    .s_axis_qdma_h2c_tlast                (s_axis_qdma_h2c_sim_tlast),
+    .s_axis_qdma_h2c_tuser_qid            (s_axis_qdma_h2c_sim_tuser_qid),
+    .s_axis_qdma_h2c_tuser_port_id        (s_axis_qdma_h2c_sim_tuser_port_id),
+    .s_axis_qdma_h2c_tuser_err            (s_axis_qdma_h2c_sim_tuser_err),
+    .s_axis_qdma_h2c_tuser_mdata          (s_axis_qdma_h2c_sim_tuser_mdata),
+    .s_axis_qdma_h2c_tuser_mty            (s_axis_qdma_h2c_sim_tuser_mty),
+    .s_axis_qdma_h2c_tuser_zero_byte      (s_axis_qdma_h2c_sim_tuser_zero_byte),
+    .s_axis_qdma_h2c_tready               (s_axis_qdma_h2c_sim_tready),
+
+    .m_axis_qdma_c2h_tvalid               (m_axis_qdma_c2h_sim_tvalid),
+    .m_axis_qdma_c2h_tdata                (m_axis_qdma_c2h_sim_tdata),
+    .m_axis_qdma_c2h_tcrc                 (m_axis_qdma_c2h_sim_tcrc),
+    .m_axis_qdma_c2h_tlast                (m_axis_qdma_c2h_sim_tlast),
+    .m_axis_qdma_c2h_ctrl_marker          (m_axis_qdma_c2h_sim_ctrl_marker),
+    .m_axis_qdma_c2h_ctrl_port_id         (m_axis_qdma_c2h_sim_ctrl_port_id),
+    .m_axis_qdma_c2h_ctrl_ecc             (m_axis_qdma_c2h_sim_ctrl_ecc),
+    .m_axis_qdma_c2h_ctrl_len             (m_axis_qdma_c2h_sim_ctrl_len),
+    .m_axis_qdma_c2h_ctrl_qid             (m_axis_qdma_c2h_sim_ctrl_qid),
+    .m_axis_qdma_c2h_ctrl_has_cmpt        (m_axis_qdma_c2h_sim_ctrl_has_cmpt),
+    .m_axis_qdma_c2h_mty                  (m_axis_qdma_c2h_sim_mty),
+    .m_axis_qdma_c2h_tready               (m_axis_qdma_c2h_sim_tready),
+
+    .m_axis_qdma_cpl_tvalid               (m_axis_qdma_cpl_sim_tvalid),
+    .m_axis_qdma_cpl_tdata                (m_axis_qdma_cpl_sim_tdata),
+    .m_axis_qdma_cpl_size                 (m_axis_qdma_cpl_sim_size),
+    .m_axis_qdma_cpl_dpar                 (m_axis_qdma_cpl_sim_dpar),
+    .m_axis_qdma_cpl_ctrl_qid             (m_axis_qdma_cpl_sim_ctrl_qid),
+    .m_axis_qdma_cpl_ctrl_cmpt_type       (m_axis_qdma_cpl_sim_ctrl_cmpt_type),
+    .m_axis_qdma_cpl_ctrl_wait_pld_pkt_id (m_axis_qdma_cpl_sim_ctrl_wait_pld_pkt_id),
+    .m_axis_qdma_cpl_ctrl_port_id         (m_axis_qdma_cpl_sim_ctrl_port_id),
+    .m_axis_qdma_cpl_ctrl_marker          (m_axis_qdma_cpl_sim_ctrl_marker),
+    .m_axis_qdma_cpl_ctrl_user_trig       (m_axis_qdma_cpl_sim_ctrl_user_trig),
+    .m_axis_qdma_cpl_ctrl_col_idx         (m_axis_qdma_cpl_sim_ctrl_col_idx),
+    .m_axis_qdma_cpl_ctrl_err_idx         (m_axis_qdma_cpl_sim_ctrl_err_idx),
+    .m_axis_qdma_cpl_ctrl_no_wrb_marker   (m_axis_qdma_cpl_sim_ctrl_no_wrb_marker),
+    .m_axis_qdma_cpl_tready               (m_axis_qdma_cpl_sim_tready),
+`endif
 
     .mod_rstn                             (qdma_rstn),
     .mod_rst_done                         (qdma_rst_done),
@@ -731,6 +759,7 @@ wire          m_axi_rready;
       .m_axis_cmac_rx_tlast         (axis_cmac_rx_tlast[i]),
       .m_axis_cmac_rx_tuser_err     (axis_cmac_rx_tuser_err[i]),
 
+`ifdef __synthesis__
       .gt_rxp                       (qsfp_rxp[`getvec(4, i)]),
       .gt_rxn                       (qsfp_rxn[`getvec(4, i)]),
       .gt_txp                       (qsfp_txp[`getvec(4, i)]),
@@ -739,6 +768,23 @@ wire          m_axi_rready;
       .gt_refclk_n                  (qsfp_refclk_n[i]),
 
       .cmac_clk                     (cmac_clk[i]),
+`else
+      .m_axis_cmac_tx_sim_tvalid    (m_axis_cmac_tx_sim_tvalid[i]),
+      .m_axis_cmac_tx_sim_tdata     (m_axis_cmac_tx_sim_tdata[`getvec(512, i)]),
+      .m_axis_cmac_tx_sim_tkeep     (m_axis_cmac_tx_sim_tkeep[`getvec(64, i)]),
+      .m_axis_cmac_tx_sim_tlast     (m_axis_cmac_tx_sim_tlast[i]),
+      .m_axis_cmac_tx_sim_tuser_err (m_axis_cmac_tx_sim_tuser_err[i]),
+      .m_axis_cmac_tx_sim_tready    (m_axis_cmac_tx_sim_tready[i]),
+
+      .s_axis_cmac_rx_sim_tvalid    (s_axis_cmac_rx_sim_tvalid[i]),
+      .s_axis_cmac_rx_sim_tdata     (s_axis_cmac_rx_sim_tdata[`getvec(512, i)]),
+      .s_axis_cmac_rx_sim_tkeep     (s_axis_cmac_rx_sim_tkeep[`getvec(64, i)]),
+      .s_axis_cmac_rx_sim_tlast     (s_axis_cmac_rx_sim_tlast[i]),
+      .s_axis_cmac_rx_sim_tuser_err (s_axis_cmac_rx_sim_tuser_err[i]),
+
+      .cmac_clk                     (cmac_clk[i]),
+`endif
+
       .mod_rstn                     (cmac_rstn[i]),
       .mod_rst_done                 (cmac_rst_done[i]),
       .axil_aclk                    (axil_aclk)
@@ -872,167 +918,13 @@ wire          m_axi_rready;
 
     .axil_aclk                       (axil_aclk),
     .cmac_clk                        (cmac_clk)
-);
+  );
+  
+  assign QSFP1_RESETL = 'd1;
+assign QSFP2_RESETL = 'd1;
+assign QSFP1_LPMODE = 'd0;
+assign QSFP2_LPMODE = 'd0;
 
-ddr_top ddr_top
-(
-  .axi_clk            (axis_aclk              ),
-  .axi_rst            (qdma_rstn              ),
-  .m_axi_awready      (m_axi_awready          ),
-  .m_axi_awid         (m_axi_awid             ),
-  .m_axi_awaddr       (m_axi_awaddr           ),
-  .m_axi_awuser       (m_axi_awuser           ),
-  .m_axi_awlen        (m_axi_awlen            ),
-  .m_axi_awsize       (m_axi_awsize           ),
-  .m_axi_awburst      (m_axi_awburst          ),
-  .m_axi_awprot       (m_axi_awprot           ),
-  .m_axi_awvalid      (m_axi_awvalid          ),
-  .m_axi_awlock       (m_axi_awlock           ),
-  .m_axi_awcache      (m_axi_awcache          ),
-  .m_axi_wready       (m_axi_wready           ),
-  .m_axi_wdata        (m_axi_wdata            ),
-  .m_axi_wuser        (m_axi_wuser            ),
-  .m_axi_wstrb        (m_axi_wstrb            ),
-  .m_axi_wlast        (m_axi_wlast            ),
-  .m_axi_wvalid       (m_axi_wvalid           ),
-  .m_axi_bid          (m_axi_bid              ),
-  .m_axi_bresp        (m_axi_bresp            ),
-  .m_axi_bvalid       (m_axi_bvalid           ),
-  .m_axi_bready       (m_axi_bready           ),
-  .m_axi_arready      (m_axi_arready          ),
-  .m_axi_arid         (m_axi_arid             ),
-  .m_axi_araddr       (m_axi_araddr           ),
-  .m_axi_aruser       (m_axi_aruser           ),
-  .m_axi_arlen        (m_axi_arlen            ),
-  .m_axi_arsize       (m_axi_arsize           ),
-  .m_axi_arburst      (m_axi_arburst          ),
-  .m_axi_arprot       (m_axi_arprot           ),
-  .m_axi_arvalid      (m_axi_arvalid          ),
-  .m_axi_arlock       (m_axi_arlock           ),
-  .m_axi_arcache      (m_axi_arcache          ), 
-  .m_axi_rid          (m_axi_rid              ),
-  .m_axi_rdata        (m_axi_rdata            ),
-  .m_axi_rresp        (m_axi_rresp            ),
-  .m_axi_rlast        (m_axi_rlast            ),
-  .m_axi_rvalid       (m_axi_rvalid           ),
-  .m_axi_rready       (m_axi_rready           ),
-
-//  user
-  .m_axi_user_awready  (),
-  .m_axi_user_awid     ('d1                   ),
-  .m_axi_user_awaddr   ('d1                   ),
-  .m_axi_user_awuser   ('d1                   ),
-  .m_axi_user_awlen    ('d1                   ),
-  .m_axi_user_awsize   ('d1                   ),
-  .m_axi_user_awburst  ('d1                   ),
-  .m_axi_user_awprot   ('d1                   ),
-  .m_axi_user_awvalid  ('d1                   ),
-  .m_axi_user_awlock   ('d1                   ),
-  .m_axi_user_awcache  ('d1                   ),
-
-  .m_axi_user_wready   (                      ),
-  .m_axi_user_wdata    ('d1                   ),
-  .m_axi_user_wuser    ('d1                   ),
-  .m_axi_user_wstrb    ('d1                   ),
-  .m_axi_user_wlast    ('d1                   ),
-  .m_axi_user_wvalid   ('d1                   ),
-
-  .m_axi_user_bid      (),
-  .m_axi_user_bresp    (),
-  .m_axi_user_bvalid   (),
-  .m_axi_user_bready   ('d1                   ),
-
-  .m_axi_user_arready  (),
-  .m_axi_user_arid     ('d1                   ),
-  .m_axi_user_araddr   ('d1                   ),
-  .m_axi_user_aruser   ('d1                   ),
-  .m_axi_user_arlen    ('d1                   ),
-  .m_axi_user_arsize   ('d1                   ),
-  .m_axi_user_arburst  ('d1                   ),
-  .m_axi_user_arprot   ('d1                   ),
-  .m_axi_user_arvalid  ('d1                   ),
-  .m_axi_user_arlock   ('d1                   ),
-  .m_axi_user_arcache  ('d1                   ),
-
-  .m_axi_user_rid      (),
-  .m_axi_user_rdata    (),
-  .m_axi_user_rresp    (),
-  .m_axi_user_rlast    (),
-  .m_axi_user_rvalid   (),
-  .m_axi_user_rready   ('d1                     ),
-
-  .c0_sys_clk_p         (c0_sys_clk_p           ),
-  .c0_sys_clk_n         (c0_sys_clk_n           ),
-  .c0_ddr4_act_n        (c0_ddr4_act_n          ),
-  .c0_ddr4_adr          (c0_ddr4_adr            ),
-  .c0_ddr4_ba           (c0_ddr4_ba             ),
-  .c0_ddr4_bg           (c0_ddr4_bg             ),
-  .c0_ddr4_cke          (c0_ddr4_cke            ),
-  .c0_ddr4_odt          (c0_ddr4_odt            ),
-  .c0_ddr4_cs_n         (c0_ddr4_cs_n           ),
-  .c0_ddr4_ck_t         (c0_ddr4_ck_t           ),
-  .c0_ddr4_ck_c         (c0_ddr4_ck_c           ),
-  .c0_ddr4_reset_n      (c0_ddr4_reset_n        ),
-  .c0_ddr4_dm_dbi_n     (c0_ddr4_dm_dbi_n       ),
-  .c0_ddr4_dq           (c0_ddr4_dq             ),
-  .c0_ddr4_dqs_c        (c0_ddr4_dqs_c          ),
-  .c0_ddr4_dqs_t        (c0_ddr4_dqs_t          ),
-
-  .c1_sys_clk_p         (c1_sys_clk_p           ),
-  .c1_sys_clk_n         (c1_sys_clk_n           ),
-  .c1_ddr4_act_n        (c1_ddr4_act_n          ),
-  .c1_ddr4_adr          (c1_ddr4_adr            ),
-  .c1_ddr4_ba           (c1_ddr4_ba             ),
-  .c1_ddr4_bg           (c1_ddr4_bg             ),
-  .c1_ddr4_cke          (c1_ddr4_cke            ),
-  .c1_ddr4_odt          (c1_ddr4_odt            ),
-  .c1_ddr4_cs_n         (c1_ddr4_cs_n           ),
-  .c1_ddr4_ck_t         (c1_ddr4_ck_t           ),
-  .c1_ddr4_ck_c         (c1_ddr4_ck_c           ),
-  .c1_ddr4_reset_n      (c1_ddr4_reset_n        ),
-  .c1_ddr4_dm_dbi_n     (c1_ddr4_dm_dbi_n       ),
-  .c1_ddr4_dq           (c1_ddr4_dq             ),
-  .c1_ddr4_dqs_c        (c1_ddr4_dqs_c          ),
-  .c1_ddr4_dqs_t        (c1_ddr4_dqs_t          ),
-
-  .c2_sys_clk_p         (c2_sys_clk_p           ),
-  .c2_sys_clk_n         (c2_sys_clk_n           ),
-  .c2_ddr4_act_n        (c2_ddr4_act_n          ),
-  .c2_ddr4_adr          (c2_ddr4_adr            ),
-  .c2_ddr4_ba           (c2_ddr4_ba             ),
-  .c2_ddr4_bg           (c2_ddr4_bg             ),
-  .c2_ddr4_cke          (c2_ddr4_cke            ),
-  .c2_ddr4_odt          (c2_ddr4_odt            ),
-  .c2_ddr4_cs_n         (c2_ddr4_cs_n           ),
-  .c2_ddr4_ck_t         (c2_ddr4_ck_t           ),
-  .c2_ddr4_ck_c         (c2_ddr4_ck_c           ),
-  .c2_ddr4_reset_n      (c2_ddr4_reset_n        ),
-  .c2_ddr4_dm_dbi_n     (c2_ddr4_dm_dbi_n       ),
-  .c2_ddr4_dq           (c2_ddr4_dq             ),
-  .c2_ddr4_dqs_c        (c2_ddr4_dqs_c          ),
-  .c2_ddr4_dqs_t        (c2_ddr4_dqs_t          ),
-
-  .c3_sys_clk_p         (c3_sys_clk_p           ),
-  .c3_sys_clk_n         (c3_sys_clk_n           ),
-  .c3_ddr4_act_n        (c3_ddr4_act_n          ),
-  .c3_ddr4_adr          (c3_ddr4_adr            ),
-  .c3_ddr4_ba           (c3_ddr4_ba             ),
-  .c3_ddr4_bg           (c3_ddr4_bg             ),
-  .c3_ddr4_cke          (c3_ddr4_cke            ),
-  .c3_ddr4_odt          (c3_ddr4_odt            ),
-  .c3_ddr4_cs_n         (c3_ddr4_cs_n           ),
-  .c3_ddr4_ck_t         (c3_ddr4_ck_t           ),
-  .c3_ddr4_ck_c         (c3_ddr4_ck_c           ),
-  .c3_ddr4_reset_n      (c3_ddr4_reset_n        ),
-  .c3_ddr4_dm_dbi_n     (c3_ddr4_dm_dbi_n       ),
-  .c3_ddr4_dq           (c3_ddr4_dq             ),
-  .c3_ddr4_dqs_c        (c3_ddr4_dqs_c          ),
-  .c3_ddr4_dqs_t        (c3_ddr4_dqs_t          )
-);
-
-assign  QSFP1_RESET = 'd1;
-assign  QSFP2_RESET = 'd1;
-assign  QSFP1_LPMOD = 'd0;
-assign  QSFP2_LPMOD = 'd0;
+  
 
 endmodule: open_nic_shell

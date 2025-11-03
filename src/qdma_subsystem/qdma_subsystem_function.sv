@@ -81,45 +81,45 @@ module qdma_subsystem_function #(
   localparam C_PKT_FIFO_DEPTH = 32;
   localparam C_QID_FIFO_DEPTH = 16;
 
-  wire   [15:0] q_base;
-  wire   [15:0] num_q;
-  wire [2047:0] indir_table;
-  wire  [319:0] hash_key;
+(* MARK_DEBUG="true" *)  wire   [15:0] q_base;
+(* MARK_DEBUG="true" *)  wire   [15:0] num_q;
+(* MARK_DEBUG="true" *)  wire [2047:0] indir_table;
+(* MARK_DEBUG="true" *)  wire  [319:0] hash_key;
 
-  reg           h2c_started;
-  reg           h2c_matched;
-  wire          h2c_q_in_range;
-  wire          h2c_match;
+(* MARK_DEBUG="true" *)  reg           h2c_started;
+(* MARK_DEBUG="true" *)  reg           h2c_matched;
+(* MARK_DEBUG="true" *)  wire          h2c_q_in_range;
+(* MARK_DEBUG="true" *)  wire          h2c_match;
 
-  wire          axis_h2c_tvalid;
-  wire  [511:0] axis_h2c_tdata;
-  wire   [63:0] axis_h2c_tkeep;
-  wire          axis_h2c_tlast;
-  wire   [15:0] axis_h2c_tuser_size;
-  wire          axis_h2c_tready;
+(* MARK_DEBUG="true" *)  wire          axis_h2c_tvalid;
+(* MARK_DEBUG="true" *)  wire  [511:0] axis_h2c_tdata;
+(* MARK_DEBUG="true" *)  wire   [63:0] axis_h2c_tkeep;
+(* MARK_DEBUG="true" *)  wire          axis_h2c_tlast;
+(* MARK_DEBUG="true" *)  wire   [15:0] axis_h2c_tuser_size;
+(* MARK_DEBUG="true" *)  wire          axis_h2c_tready;
 
-  wire          axis_c2h_tvalid;
-  wire  [511:0] axis_c2h_tdata;
-  wire          axis_c2h_tlast;
-  wire   [15:0] axis_c2h_tuser_size;
-  wire          axis_c2h_tready;
+(* MARK_DEBUG="true" *)  wire          axis_c2h_tvalid;
+(* MARK_DEBUG="true" *)  wire  [511:0] axis_c2h_tdata;
+(* MARK_DEBUG="true" *)  wire          axis_c2h_tlast;
+(* MARK_DEBUG="true" *)  wire   [15:0] axis_c2h_tuser_size;
+(* MARK_DEBUG="true" *)  wire          axis_c2h_tready;
 
-  wire          hash_result_valid;
-  wire   [31:0] hash_result;
+(* MARK_DEBUG="true" *)  wire          hash_result_valid;
+(* MARK_DEBUG="true" *)  wire   [31:0] hash_result;
 
-  reg           qid_fifo_wr_en;
-  reg    [10:0] qid_fifo_din;
-  wire          qid_fifo_rd_en;
-  wire   [10:0] qid_fifo_dout;
-  wire          qid_fifo_empty;
-  wire          qid_fifo_full;
+(* MARK_DEBUG="true" *)  reg           qid_fifo_wr_en;
+(* MARK_DEBUG="true" *)  reg    [10:0] qid_fifo_din;
+(* MARK_DEBUG="true" *)  wire          qid_fifo_rd_en;
+(* MARK_DEBUG="true" *)  wire   [10:0] qid_fifo_dout;
+(* MARK_DEBUG="true" *)  wire          qid_fifo_empty;
+(* MARK_DEBUG="true" *)  wire          qid_fifo_full;
 
-  wire          axis_c2h_buf_tvalid;
-  wire  [511:0] axis_c2h_buf_tdata;
-  wire          axis_c2h_buf_tlast;
-  wire   [15:0] axis_c2h_buf_tuser_size;
-  wire          axis_c2h_buf_tready;
-
+(* MARK_DEBUG="true" *)  wire          axis_c2h_buf_tvalid;
+(* MARK_DEBUG="true" *)  wire  [511:0] axis_c2h_buf_tdata;
+(* MARK_DEBUG="true" *)  wire          axis_c2h_buf_tlast;
+(* MARK_DEBUG="true" *)  wire   [15:0] axis_c2h_buf_tuser_size;
+(* MARK_DEBUG="true" *)  wire          axis_c2h_buf_tready;
+ 
   qdma_subsystem_function_register reg_inst (
     .s_axil_awvalid (s_axil_awvalid),
     .s_axil_awaddr  (s_axil_awaddr),

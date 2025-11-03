@@ -68,10 +68,10 @@ module qdma_subsystem_function_register (
   output    [1:0] s_axil_rresp,
   input           s_axil_rready,
 
-  output   [15:0] q_base,
-  output   [15:0] num_q,
-  output [2047:0] indir_table,
-  output  [319:0] hash_key,
+(* MARK_DEBUG="true" *)  output   [15:0] q_base,
+(* MARK_DEBUG="true" *)  output   [15:0] num_q,
+(* MARK_DEBUG="true" *)  output [2047:0] indir_table,
+(* MARK_DEBUG="true" *)  output  [319:0] hash_key,
 
   input           axil_aclk,
   input           axis_aclk,
